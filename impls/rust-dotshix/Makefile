@@ -1,10 +1,9 @@
-all: target/debug/step2_eval
+all: target/debug/step3_env
 
 target/debug/step1_read_print:
-	@echo "Building step2_eval..."
-	cargo build --bin step2_eval
+	@echo "Building step3_env..."
+	cargo build --bin step3_env.
 
 clean:
 	cargo clean
-	rm -f target/debug/step2_eval
-
+	rm -f target/debug/step3_env.

@@ -13,5 +13,5 @@ pest_derive = "2.7.10"
 rustyline = "14.0.0"
 
 [[bin]]
-name = "step2_eval"
-path = "src/step2_eval.rs"
+name = "step3_env"
+path = "src/step3_env.rs"
