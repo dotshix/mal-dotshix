@@ -1,0 +1,34 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" | "," }
+COMMENT = @{ ";" ~ (!("\n" | "\r") ~ ANY)* }
+
+STRING = ${ "\"" ~ inner ~ "\"" }
+inner = @{ char* }
+char = {
+    !("\"" | "\\") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t" | "s")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+boolean = @{ ("true" | "false" ) ~ !ident_char }
+nil = @{ ("nil") ~ !ident_char }
+ident_char = _{ ASCII_ALPHANUMERIC | "_" | "-" | "+" | "/" | "*" | "." }
+
+round = { "(" ~ obj* ~ ")" }
+square = { "[" ~ obj* ~ "]" }
+curly = { "{" ~ obj* ~ "}" }
+
+quote = { "'" ~ obj }
+quasiquote = { "`" ~ obj }
+unquote = { "~" ~ obj }
+splicing_unquote = { "~@" ~ obj }
+deref = { "@" ~ obj }
+metadata = { "^" ~ obj ~ obj }
+number = @{ "-"? ~ ASCII_DIGIT+ }
+symbol = @{ !boolean ~ !nil ~ (!SPECIAL_CHAR ~ !WHITESPACE ~ !COMMENT ~ ANY)+ }
+SPECIAL_CHAR = { "[" | "]" | "{" | "}" | "(" | ")" | "`" | "~" | "^" | "@" | "\"" }
+NON_SPECIAL_SEQ = @{ (!SPECIAL_CHAR ~ !WHITESPACE ~ !COMMENT ~ ANY)+ }
+atom = @{ ":" ~ symbol }
+
+obj = _{ metadata | splicing_unquote | unquote | quasiquote | quote | number | STRING | atom | round | square | curly | symbol | boolean | nil | COMMENT | deref }
+
+mal = { SOI ~ obj* ~ EOI }

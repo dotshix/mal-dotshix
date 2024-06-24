@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+set -x
+
+STEP=${STEP:-step0_repl}
+DIR=$(dirname $0)
+
+# Compile the Rust program
+cargo build --manifest-path $DIR/Cargo.toml --bin $STEP
+
+# Run the compiled binary
+exec $DIR/target/debug/$STEP "${@}"

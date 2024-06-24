@@ -1,0 +1,1 @@
+/home/dario/mal/impls/rust-dotshix/target/debug/step1_read_print: /home/dario/mal/impls/rust-dotshix/src/mal.pest /home/dario/mal/impls/rust-dotshix/src/printer.rs /home/dario/mal/impls/rust-dotshix/src/reader.rs /home/dario/mal/impls/rust-dotshix/src/step2_eval.rs
