@@ -5,7 +5,7 @@ mod env;
 use env_logger;
 use pest::error::Error;
 use printer::mal_printer::print_node;
-use reader::mal_parser::{format_pest_error, parse_input, MalValue, Rule};
+use reader::{format_pest_error, parse_input, MalValue, Rule};
 use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result as RustylineResult};

@@ -1,5 +1,5 @@
 pub mod mal_printer {
-    use crate::reader::mal_parser::MalValue;
+    use crate::MalValue;
 
     fn print_list(list: &Vec<MalValue>, open_delim: &str, close_delim: &str) {
         print!("{}", open_delim);
