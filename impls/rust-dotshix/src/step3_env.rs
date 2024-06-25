@@ -9,9 +9,11 @@ use reader::{format_pest_error, parse_input, MalValue, Rule};
 use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result as RustylineResult};
-use std::collections::HashMap;
 use std::result::Result as StdResult;
-use env::{create_repl_env, Function};
+use env::{create_repl_env, Env};
+use std::rc::Rc;
+use std::cell::RefCell;
+
 
 // Custom Result type for our application
 type Result<T> = StdResult<T, String>;
@@ -20,10 +22,10 @@ fn read(input: String) -> StdResult<Vec<MalValue>, Error<Rule>> {
     parse_input(&input)
 }
 
-fn eval_ast(ast: &MalValue, env: &HashMap<String, Function>) -> Result<MalValue> {
+fn eval_ast(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
     match ast {
         MalValue::Symbol(s) => {
-            if let Some(_func) = env.get(s) {
+            if let Some(_func) = env.borrow().get(s) {
                 Ok(MalValue::Symbol(s.clone()))
             } else {
                 // TODO Might need to change this
@@ -32,7 +34,7 @@ fn eval_ast(ast: &MalValue, env: &HashMap<String, Function>) -> Result<MalValue>
             }
         }
         MalValue::Round(list) | MalValue::Square(list) | MalValue::Curly(list) => {
-            let eval_list: Result<Vec<MalValue>> = list.iter().map(|x| eval(x, env)).collect();
+            let eval_list: Result<Vec<MalValue>> = list.iter().map(|x| eval(x, env.clone())).collect();
             match eval_list {
                 Ok(eval_list) => match ast {
                     MalValue::Round(_) => Ok(MalValue::Round(eval_list)),
@@ -44,7 +46,7 @@ fn eval_ast(ast: &MalValue, env: &HashMap<String, Function>) -> Result<MalValue>
             }
         }
         MalValue::Mal(list) => {
-            let eval_list: Result<Vec<MalValue>> = list.iter().map(|x| eval(x, env)).collect();
+            let eval_list: Result<Vec<MalValue>> = list.iter().map(|x| eval(x, env.clone())).collect();
             match eval_list {
                 Ok(eval_list) => Ok(MalValue::Mal(eval_list)),
                 Err(e) => Err(e),
@@ -54,7 +56,7 @@ fn eval_ast(ast: &MalValue, env: &HashMap<String, Function>) -> Result<MalValue>
     }
 }
 
-fn eval(ast: &MalValue, env: &HashMap<String, Function>) -> Result<MalValue> {
+fn eval(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
     match ast {
         MalValue::Round(list) => {
             if list.is_empty() {
@@ -62,14 +64,14 @@ fn eval(ast: &MalValue, env: &HashMap<String, Function>) -> Result<MalValue> {
             }
             let eval_list: Vec<MalValue> = list
                 .iter()
-                .map(|x| eval(x, env))
+                .map(|x| eval(x, env.clone()))
                 .collect::<Result<Vec<MalValue>>>()?;
             let name = &eval_list[0];
             let rest = &eval_list[1..];
 
             match name {
                 MalValue::Symbol(s) => {
-                    if let Some(func) = env.get(s) {
+                    if let Some(func) = env.borrow().get(s) {
                         return func(rest);
                     }
                     Ok(MalValue::Round(eval_list.clone()))
@@ -81,8 +83,8 @@ fn eval(ast: &MalValue, env: &HashMap<String, Function>) -> Result<MalValue> {
     }
 }
 
-fn eval_all(input: Vec<MalValue>, env: &HashMap<String, Function>) -> Result<Vec<MalValue>> {
-    input.into_iter().map(|x| eval(&x, env)).collect()
+fn eval_all(input: Vec<MalValue>, env: Rc<RefCell<Env>>) -> Result<Vec<MalValue>> {
+    input.into_iter().map(|x| eval(&x, env.clone())).collect()
 }
 
 fn print(input: Vec<MalValue>) -> String {
@@ -93,9 +95,9 @@ fn print(input: Vec<MalValue>) -> String {
     String::new()
 }
 
-fn rep(input: String, env: &HashMap<String, Function>) -> String {
+fn rep(input: String, env: Rc<RefCell<Env>>) -> String {
     match read(input) {
-        Ok(parsed) => match eval_all(parsed, env) {
+        Ok(parsed) => match eval_all(parsed, env.clone()) {
             Ok(evaluated) => print(evaluated),
             Err(e) => format!("Error: {}", e),
         },
@@ -114,7 +116,7 @@ fn main() -> RustylineResult<()> {
         let readline = rl.readline("user> ");
         match readline {
             Ok(line) => {
-                let result = rep(line, &repl_env);
+                let result = rep(line, repl_env.clone());
                 println!("{}", result);
             }
 
