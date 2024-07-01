@@ -1,3 +1,4 @@
+use crate::env::Function;
 use log::debug;
 use pest::error::{Error, ErrorVariant};
 use pest::iterators::Pair;
@@ -22,6 +23,7 @@ pub enum MalValue {
     Comment(String),       // Represents a LISP comment, e.g., ; this is a comment
     NonSpecialSeq(String), // Represents a sequence of characters that are not special symbols, e.g., abc123
     Atom(String), // Represents a LISP atom, e.g., a single, indivisible unit like a variable name or keyword
+    BuiltinFunction(Function),
     // Other(String),         // Represents any other token not specifically categorized, e.g., +
     EOI, // Represents the end of input
 }
@@ -187,6 +189,7 @@ fn build_ast(pair: Pair<Rule>) -> MalValue {
             debug!("NON_SPECIAL_SEQ content: {:?}", content);
             MalValue::NonSpecialSeq(content)
         }
+
         Rule::mal => {
             let content = pair.into_inner().map(build_ast).collect::<Vec<_>>();
             debug!("Mal content: {:?}", content);

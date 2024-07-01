@@ -10,7 +10,7 @@ use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result as RustylineResult};
 use std::result::Result as StdResult;
-use env::{create_repl_env, Env};
+use env::{create_repl_env, Env, Function};
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -25,32 +25,22 @@ fn read(input: String) -> StdResult<Vec<MalValue>, Error<Rule>> {
 fn eval_ast(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
     match ast {
         MalValue::Symbol(s) => {
-            if let Some(_func) = env.borrow().get(s) {
+            if env.borrow().get(s).is_some() {
                 Ok(MalValue::Symbol(s.clone()))
             } else {
-                // TODO Might need to change this
-                //Err(format!("Symbol not found in environment: {}", s))
+                // Return the symbol as is, assuming it might be defined later
                 Ok(MalValue::Symbol(s.clone()))
             }
         }
-        MalValue::Round(list) | MalValue::Square(list) | MalValue::Curly(list) => {
+        MalValue::Round(list) | MalValue::Square(list) | MalValue::Curly(list) | MalValue::Mal(list) => {
             let eval_list: Result<Vec<MalValue>> = list.iter().map(|x| eval(x, env.clone())).collect();
-            match eval_list {
-                Ok(eval_list) => match ast {
-                    MalValue::Round(_) => Ok(MalValue::Round(eval_list)),
-                    MalValue::Square(_) => Ok(MalValue::Square(eval_list)),
-                    MalValue::Curly(_) => Ok(MalValue::Curly(eval_list)),
-                    _ => unreachable!(),
-                },
-                Err(e) => Err(e),
-            }
-        }
-        MalValue::Mal(list) => {
-            let eval_list: Result<Vec<MalValue>> = list.iter().map(|x| eval(x, env.clone())).collect();
-            match eval_list {
-                Ok(eval_list) => Ok(MalValue::Mal(eval_list)),
-                Err(e) => Err(e),
-            }
+            eval_list.map(|eval_list| match ast {
+                MalValue::Round(_) => MalValue::Round(eval_list),
+                MalValue::Square(_) => MalValue::Square(eval_list),
+                MalValue::Curly(_) => MalValue::Curly(eval_list),
+                MalValue::Mal(_) => MalValue::Mal(eval_list),
+                _ => unreachable!(),
+            })
         }
         _ => Ok(ast.clone()),
     }
@@ -58,27 +48,54 @@ fn eval_ast(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
 
 fn eval(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
     match ast {
+        // Case for evaluating a single symbol
+        MalValue::Symbol(s) => {
+            // Borrow the environment to look up the symbol
+            let env_borrowed = env.borrow();
+            if let Some(value) = env_borrowed.get(s) {
+                // If the symbol is found, return its value
+                Ok(value.clone())
+            } else {
+                // If the symbol is not found, return an error
+                Err(format!("Symbol '{}' not found in environment", s).into())
+            }
+        }
+
+        // Case for evaluating a list (represented as a Round value)
         MalValue::Round(list) => {
             if list.is_empty() {
                 return Ok(MalValue::Round(list.clone()));
             }
-            let eval_list: Vec<MalValue> = list
-                .iter()
-                .map(|x| eval(x, env.clone()))
-                .collect::<Result<Vec<MalValue>>>()?;
-            let name = &eval_list[0];
-            let rest = &eval_list[1..];
 
-            match name {
-                MalValue::Symbol(s) => {
-                    if let Some(func) = env.borrow().get(s) {
-                        return func(rest);
-                    }
-                    Ok(MalValue::Round(eval_list.clone()))
+            // Extract the first element (function name) and the rest (arguments)
+            let name = &list[0];
+            let rest = &list[1..];
+
+            if let MalValue::Symbol(s) = name {
+                // Look up the function in the environment
+                let func = env.borrow().get(s);
+                if let Some(MalValue::BuiltinFunction(Function::WithEnv(func, func_env))) = func {
+                    // If the function is a built-in with an environment, call it with the arguments and environment
+                    return func(rest, func_env.clone());
+                } else if let Some(MalValue::BuiltinFunction(Function::Builtin(func))) = func {
+                    // If the function is a simple built-in, call it with the arguments
+                    let eval_rest: Vec<MalValue> = rest.iter().map(|x| eval(x, env.clone())).collect::<Result<Vec<MalValue>>>()?;
+                    return func(&eval_rest);
+                } else if let Some(value) = func {
+                    // If the function is found but not callable, return its value
+                    return Ok(value.clone());
+                } else {
+                    // If the function is not found, return an error
+                    return Err(format!("Symbol '{}' not found in environment", s).into());
                 }
-                _ => Ok(MalValue::Round(eval_list.clone())),
             }
+
+            // If the first element is not a symbol, evaluate the list elements
+            let eval_list: Vec<MalValue> = list.iter().map(|x| eval(x, env.clone())).collect::<Result<Vec<MalValue>>>()?;
+            Ok(MalValue::Round(eval_list))
         }
+
+        // Case for other types of AST nodes, delegated to eval_ast
         _ => eval_ast(ast, env),
     }
 }

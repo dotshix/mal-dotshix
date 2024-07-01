@@ -42,6 +42,7 @@ pub fn print_node(node: &MalValue) {
                 print_node(item);
             }
         }
-        MalValue::EOI => {} // Do nothing for EOI
+        MalValue::BuiltinFunction(_) => {} // Do nothing for BuiltinFunction
+        MalValue::EOI => {}                // Do nothing for EOI
     }
 }
