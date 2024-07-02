@@ -71,7 +71,7 @@ impl Bindings {
     }
 }
 
-// Struct for Env (Environment or ExecutionContext)
+// Struct for Env
 pub struct Env {
     bindings: BindingsHandle,
 }
@@ -146,6 +146,51 @@ pub fn def_bang(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     Ok(value)
 }
 
+pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
+    if args.len() != 2 {
+        return Err("let* requires exactly two arguments".to_string());
+    }
+
+    let bindings = match &args[0] {
+        MalValue::Round(v) => v,
+        MalValue::Square(v) => v,
+        _ => return Err("let* first argument must be a list of bindings".to_string()),
+    };
+
+    // Create a new environment using the current environment as the outer value
+    // 1. &env.borrow().bindings  -- Borrow bindings immuatably from current env
+    // 2. Rc::clone(&env.borrow().bindings) -- Create a new reference counter pointer to the bindings
+    // 3. Env::new(Rc::clone(&env.borrow().bindings)) -- Create a new environment with the cloned bindings as the parent
+    // 4. RefCell::new(Env::new(Rc::clone(&env.borrow().bindings))) -- Wrap the new environment in a RefCell to allow interior mutability
+    // 5. Rc::new(RefCell::new(Env::new(Rc::clone(&env.borrow().bindings)))) -- Wrap the RefCell in an Rc to allow shared ownership
+    let new_env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(
+        &env.borrow().bindings,
+    )))));
+
+    // Iterate over bindings in pairs
+    for pair in bindings.chunks(2) {
+        if pair.len() != 2 {
+            return Err("Bindings must be pairs".to_string());
+        }
+
+        // Extract key and value
+        let key = match &pair[0] {
+            MalValue::Symbol(s) => s.clone(),
+            _ => return Err("Bindings must start with a symbol".to_string()),
+        };
+
+        let value = &pair[1];
+        // Evaluate the value in the new_env environment
+        let evaluated_value = eval(value, Rc::clone(&new_env))?;
+        // Set the evaluated value in the new let_env environment
+        new_env.borrow_mut().set(key, evaluated_value);
+    }
+
+    // Evaluate the body of the let* form in the new let_env environment
+    let body = args[1].clone();
+    eval(&body, Rc::clone(&new_env))
+}
+
 // Function to create the REPL environment with built-in functions
 pub fn create_repl_env() -> Rc<RefCell<Env>> {
     let repl_env = Rc::new(RefCell::new(Env::new(None)));
@@ -169,6 +214,11 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
     repl_env.borrow_mut().set(
         "def!".to_string(),
         MalValue::BuiltinFunction(Function::WithEnv(def_bang, Rc::clone(&repl_env))),
+    );
+
+    repl_env.borrow_mut().set(
+        "let*".to_string(),
+        MalValue::BuiltinFunction(Function::WithEnv(let_star, Rc::clone(&repl_env))),
     );
 
     repl_env
