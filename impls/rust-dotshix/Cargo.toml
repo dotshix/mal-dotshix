@@ -13,5 +13,5 @@ pest_derive = "2.7.10"
 rustyline = "14.0.0"
 
 [[bin]]
-name = "step3_env"
-path = "src/step3_env.rs"
+name = "step4_if_fn_do"
+path = "src/step4_if_fn_do.rs"

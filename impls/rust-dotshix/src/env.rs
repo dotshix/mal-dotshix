@@ -78,13 +78,27 @@ pub struct Env {
 
 // Implementation for Env
 impl Env {
-    pub fn new(parent: Option<BindingsHandle>) -> Self {
-        Env {
-            bindings: Rc::new(RefCell::new(Bindings::new(parent))),
+    pub fn new(
+        parent: Option<BindingsHandle>,
+        binds: Option<&[MalValue]>,
+        exprs: Option<&[MalValue]>,
+    ) -> Self {
+        let bindings = Rc::new(RefCell::new(Bindings::new(parent)));
+
+        if let (Some(binds), Some(exprs)) = (binds, exprs) {
+            for (bind, expr) in binds.iter().zip(exprs.iter()) {
+                if let MalValue::Symbol(sym) = bind {
+                    bindings.borrow_mut().set(sym.clone(), expr.clone());
+                } else {
+                    eprintln!("Warning: Bindings must be symbol")
+                }
+            }
         }
+
+        Env { bindings }
     }
 
-    pub fn set(&mut self, key: String, value: MalValue) {
+    pub fn set(&self, key: String, value: MalValue) {
         self.bindings.borrow_mut().set(key, value);
     }
 
@@ -151,11 +165,16 @@ pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
         return Err("let* requires exactly two arguments".to_string());
     }
 
-    let bindings = match &args[0] {
+    let bindings_list = match &args[0] {
         MalValue::Round(v) => v,
         MalValue::Square(v) => v,
         _ => return Err("let* first argument must be a list of bindings".to_string()),
     };
+
+    // Ensure bindings list has an even number of elements
+    if bindings_list.len() % 2 != 0 {
+        return Err("Bindings must be pairs".to_string());
+    }
 
     // Create a new environment using the current environment as the outer value
     // 1. &env.borrow().bindings  -- Borrow bindings immuatably from current env
@@ -163,12 +182,14 @@ pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     // 3. Env::new(Rc::clone(&env.borrow().bindings)) -- Create a new environment with the cloned bindings as the parent
     // 4. RefCell::new(Env::new(Rc::clone(&env.borrow().bindings))) -- Wrap the new environment in a RefCell to allow interior mutability
     // 5. Rc::new(RefCell::new(Env::new(Rc::clone(&env.borrow().bindings)))) -- Wrap the RefCell in an Rc to allow shared ownership
-    let new_env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(
-        &env.borrow().bindings,
-    )))));
+    let new_env = Rc::new(RefCell::new(Env::new(
+        Some(Rc::clone(&env.borrow().bindings)),
+        None,
+        None,
+    )));
 
     // Iterate over bindings in pairs
-    for pair in bindings.chunks(2) {
+    for pair in bindings_list.chunks(2) {
         if pair.len() != 2 {
             return Err("Bindings must be pairs".to_string());
         }
@@ -193,7 +214,7 @@ pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
 
 // Function to create the REPL environment with built-in functions
 pub fn create_repl_env() -> Rc<RefCell<Env>> {
-    let repl_env = Rc::new(RefCell::new(Env::new(None)));
+    let repl_env = Rc::new(RefCell::new(Env::new(None,None,None)));
 
     repl_env.borrow_mut().set(
         "+".to_string(),
