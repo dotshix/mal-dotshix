@@ -160,6 +160,16 @@ pub fn def_bang(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     Ok(value)
 }
 
+pub fn do_func(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
+    let mut res = MalValue::Nil;
+
+    for expr in args{
+        res = eval(expr, Rc::clone(&env))?;
+    }
+
+    Ok(res)
+}
+
 pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     if args.len() != 2 {
         return Err("let* requires exactly two arguments".to_string());
@@ -181,7 +191,7 @@ pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     // 2. Rc::clone(&env.borrow().bindings) -- Create a new reference counter pointer to the bindings
     // 3. Env::new(Rc::clone(&env.borrow().bindings)) -- Create a new environment with the cloned bindings as the parent
     // 4. RefCell::new(Env::new(Rc::clone(&env.borrow().bindings))) -- Wrap the new environment in a RefCell to allow interior mutability
-    // 5. Rc::new(RefCell::new(Env::new(Rc::clone(&env.borrow().bindings)))) -- Wrap the RefCell in an Rc to allow shared ownership
+    // 5. Rc::new(RefCell::new(Env::new(Rc::clone(&env.borrow().bindings)), None None)) -- Wrap the RefCell in an Rc to allow shared ownership
     let new_env = Rc::new(RefCell::new(Env::new(
         Some(Rc::clone(&env.borrow().bindings)),
         None,
@@ -240,6 +250,11 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
     repl_env.borrow_mut().set(
         "let*".to_string(),
         MalValue::BuiltinFunction(Function::WithEnv(let_star, Rc::clone(&repl_env))),
+    );
+
+    repl_env.borrow_mut().set(
+        "do".to_string(),
+        MalValue::BuiltinFunction(Function::WithEnv(do_func, Rc::clone(&repl_env))),
     );
 
     repl_env
