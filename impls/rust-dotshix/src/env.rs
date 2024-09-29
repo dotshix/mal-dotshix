@@ -10,21 +10,29 @@ use std::result::Result as StdResult;
 type Result<T> = StdResult<T, String>;
 type BindingsHandle = Rc<RefCell<Bindings>>;
 
-// Function Enum for Builtin and WithEnv functions
+// Function Enum for  different function types
 pub enum Function {
     Builtin(fn(&[MalValue]) -> Result<MalValue>),
-    WithEnv(
-        fn(&[MalValue], Rc<RefCell<Env>>) -> Result<MalValue>,
-        Rc<RefCell<Env>>,
-    ),
+    SpecialForm(fn(&[MalValue], Rc<RefCell<Env>>) -> Result<MalValue>),
+    // WithEnv(
+    //     fn(&[MalValue], Rc<RefCell<Env>>) -> Result<MalValue>,
+    //     Rc<RefCell<Env>>,
+    // ),
+    UserDefined {
+        params: Vec<String>,
+        body: Vec<MalValue>,
+        env: Rc<RefCell<Env>>,
+    },
 }
 
 // Implementations for Debug and Clone for Function
 impl fmt::Debug for Function {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Function::Builtin(_) => write!(f, "BuiltinFunction"),
-            Function::WithEnv(_, _) => write!(f, "WithEnvFunction"),
+            Function::Builtin(_) => write!(f, "Builtin Function"),
+            // Function::WithEnv(_, _) => write!(f, "WithEnv Function"),
+            Function::UserDefined { .. } => write!(f, "UserDefined Function"),
+            Function::SpecialForm(_) => write!(f, "SpecialForm"),
         }
     }
 }
@@ -33,7 +41,13 @@ impl Clone for Function {
     fn clone(&self) -> Self {
         match self {
             Function::Builtin(func) => Function::Builtin(*func),
-            Function::WithEnv(func, env) => Function::WithEnv(*func, Rc::clone(env)),
+            // Function::WithEnv(func, env) => Function::WithEnv(*func, Rc::clone(env)),
+            Function::SpecialForm(func) => Function::SpecialForm(*func),
+            Function::UserDefined { params, body, env } => Function::UserDefined {
+                params: params.clone(),
+                body: body.clone(),
+                env: env.clone(),
+            },
         }
     }
 }
@@ -80,20 +94,8 @@ pub struct Env {
 impl Env {
     pub fn new(
         parent: Option<BindingsHandle>,
-        binds: Option<&[MalValue]>,
-        exprs: Option<&[MalValue]>,
     ) -> Self {
         let bindings = Rc::new(RefCell::new(Bindings::new(parent)));
-
-        if let (Some(binds), Some(exprs)) = (binds, exprs) {
-            for (bind, expr) in binds.iter().zip(exprs.iter()) {
-                if let MalValue::Symbol(sym) = bind {
-                    bindings.borrow_mut().set(sym.clone(), expr.clone());
-                } else {
-                    eprintln!("Warning: Bindings must be symbol")
-                }
-            }
-        }
 
         Env { bindings }
     }
@@ -104,6 +106,10 @@ impl Env {
 
     pub fn get(&self, key: &String) -> Option<MalValue> {
         self.bindings.borrow().get(key)
+    }
+
+    pub fn get_bindings(&self) -> Rc<RefCell<Bindings>> {
+        Rc::clone(&self.bindings)
     }
 }
 
@@ -163,11 +169,47 @@ pub fn def_bang(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
 pub fn do_func(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     let mut res = MalValue::Nil;
 
-    for expr in args{
+    for expr in args {
         res = eval(expr, Rc::clone(&env))?;
     }
 
     Ok(res)
+}
+
+pub fn fn_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
+    if args.len() != 2 {
+        return Err("fn* requires exactly two arguments".to_string());
+    }
+
+    let param_list = match &args[0] {
+        MalValue::Round(r) if r.is_empty() => Vec::new(), // Empty parameter list
+        MalValue::Square(s) | MalValue::Round(s) => s.clone(),
+        _ => {
+            return Err(
+                "fn* first argument must be a vector that defines the function's parameters"
+                    .to_string(),
+            )
+        }
+    };
+
+    let mut params = Vec::new();
+
+    for param in param_list {
+        match param {
+            MalValue::Symbol(s) => params.push(s.clone()),
+            _ => return Err("fn* Parameters must be Symbols".to_string()),
+        }
+    }
+
+    let body = vec![args[1].clone()]; // Store the body as a vector of expressions
+
+    let func = Function::UserDefined {
+        params,
+        body,
+        env: Rc::clone(&env),
+    };
+
+    Ok(MalValue::BuiltinFunction(func))
 }
 
 pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
@@ -194,8 +236,6 @@ pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     // 5. Rc::new(RefCell::new(Env::new(Rc::clone(&env.borrow().bindings)), None None)) -- Wrap the RefCell in an Rc to allow shared ownership
     let new_env = Rc::new(RefCell::new(Env::new(
         Some(Rc::clone(&env.borrow().bindings)),
-        None,
-        None,
     )));
 
     // Iterate over bindings in pairs
@@ -224,7 +264,7 @@ pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
 
 // Function to create the REPL environment with built-in functions
 pub fn create_repl_env() -> Rc<RefCell<Env>> {
-    let repl_env = Rc::new(RefCell::new(Env::new(None,None,None)));
+    let repl_env = Rc::new(RefCell::new(Env::new(None)));
 
     repl_env.borrow_mut().set(
         "+".to_string(),
@@ -244,17 +284,22 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
     );
     repl_env.borrow_mut().set(
         "def!".to_string(),
-        MalValue::BuiltinFunction(Function::WithEnv(def_bang, Rc::clone(&repl_env))),
+        MalValue::BuiltinFunction(Function::SpecialForm(def_bang)),
     );
 
     repl_env.borrow_mut().set(
         "let*".to_string(),
-        MalValue::BuiltinFunction(Function::WithEnv(let_star, Rc::clone(&repl_env))),
+        MalValue::BuiltinFunction(Function::SpecialForm(let_star)),
     );
 
     repl_env.borrow_mut().set(
         "do".to_string(),
-        MalValue::BuiltinFunction(Function::WithEnv(do_func, Rc::clone(&repl_env))),
+        MalValue::BuiltinFunction(Function::SpecialForm(do_func)),
+    );
+
+    repl_env.borrow_mut().set(
+        "fn*".to_string(),
+        MalValue::BuiltinFunction(Function::SpecialForm(fn_star)),
     );
 
     repl_env

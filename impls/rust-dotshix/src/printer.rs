@@ -1,4 +1,5 @@
 use crate::MalValue;
+use crate::Function;
 
 fn print_list(list: &Vec<MalValue>, open_delim: &str, close_delim: &str) {
     print!("{}", open_delim);
@@ -42,7 +43,13 @@ pub fn print_node(node: &MalValue) {
                 print_node(item);
             }
         }
-        MalValue::BuiltinFunction(_) => {} // Do nothing for BuiltinFunction
+        MalValue::BuiltinFunction(func) => {
+            match func {
+                Function::Builtin(_) => print!("<builtin function>"),
+                Function::SpecialForm(_) => print!("<special form>"),
+                Function::UserDefined { .. } => print!("<function>"),
+            }
+        }
         MalValue::EOI => {}                // Do nothing for EOI
     }
 }

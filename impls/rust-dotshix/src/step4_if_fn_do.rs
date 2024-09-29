@@ -50,13 +50,9 @@ fn eval(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
     match ast {
         // Case for evaluating a single symbol
         MalValue::Symbol(s) => {
-            // Borrow the environment to look up the symbol
-            let env_borrowed = env.borrow();
-            if let Some(value) = env_borrowed.get(s) {
-                // If the symbol is found, return its value
+            if let Some(value) = env.borrow().get(s) {
                 Ok(value.clone())
             } else {
-                // If the symbol is not found, return an error
                 Err(format!("Symbol '{}' not found in environment", s).into())
             }
         }
@@ -67,35 +63,68 @@ fn eval(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
                 return Ok(MalValue::Round(list.clone()));
             }
 
-            // Extract the first element (function name) and the rest (arguments)
-            let name = &list[0];
-            let rest = &list[1..];
+            // Evaluate the first element to get the function
+            let func = eval(&list[0], env.clone())?;
 
-            if let MalValue::Symbol(s) = name {
-                // Look up the function in the environment
-                let func = env.borrow().get(s);
-                if let Some(MalValue::BuiltinFunction(Function::WithEnv(func, func_env))) = func {
-                    // If the function is a built-in with an environment, call it with the arguments and environment
-                    return func(rest, func_env.clone());
-                } else if let Some(MalValue::BuiltinFunction(Function::Builtin(func))) = func {
-                    // If the function is a simple built-in, call it with the arguments
-                    let eval_rest: Vec<MalValue> = rest.iter().map(|x| eval(x, env.clone())).collect::<Result<Vec<MalValue>>>()?;
-                    return func(&eval_rest);
-                } else if let Some(value) = func {
-                    // If the function is found but not callable, return its value
-                    return Ok(value.clone());
-                } else {
-                    // If the function is not found, return an error
-                    return Err(format!("Symbol '{}' not found in environment", s).into());
+            match func {
+                MalValue::BuiltinFunction(Function::SpecialForm(func)) => {
+                    // Pass unevaluated arguments to the special form
+                    func(&list[1..], env.clone())
                 }
-            }
+                // MalValue::BuiltinFunction(Function::WithEnv(func, func_env)) => {
+                //     // Evaluate the arguments
+                //     let args: Vec<MalValue> = list[1..]
+                //         .iter()
+                //         .map(|x| eval(x, env.clone()))
+                //         .collect::<Result<Vec<MalValue>>>()?;
+                //     func(&args, func_env.clone())
+                // }
+                MalValue::BuiltinFunction(Function::Builtin(func)) => {
+                    // Evaluate the arguments
+                    let args: Vec<MalValue> = list[1..]
+                        .iter()
+                        .map(|x| eval(x, env.clone()))
+                        .collect::<Result<Vec<MalValue>>>()?;
+                    func(&args)
+                }
+                MalValue::BuiltinFunction(Function::UserDefined { params, body, env: func_env }) => {
+                    // Evaluate the arguments
+                    let args: Vec<MalValue> = list[1..]
+                        .iter()
+                        .map(|x| eval(x, env.clone()))
+                        .collect::<Result<Vec<MalValue>>>()?;
 
-            // If the first element is not a symbol, evaluate the list elements
-            let eval_list: Vec<MalValue> = list.iter().map(|x| eval(x, env.clone())).collect::<Result<Vec<MalValue>>>()?;
-            Ok(MalValue::Round(eval_list))
+                    if params.len() != args.len() {
+                        return Err(format!(
+                            "Expected {} arguments but got {}",
+                            params.len(),
+                            args.len()
+                        ));
+                    }
+
+                    // Create a new environment for the function
+                    let new_env = Rc::new(RefCell::new(Env::new(
+                        Some(Rc::clone(&func_env.borrow().get_bindings())),
+                    )));
+
+                    // Bind parameters to arguments
+                    for (param, arg) in params.iter().zip(args.iter()) {
+                        new_env.borrow_mut().set(param.clone(), arg.clone());
+                    }
+
+                    // Evaluate the function body
+                    let mut result = MalValue::Nil;
+                    for expr in body.iter() {
+                        result = eval(expr, Rc::clone(&new_env))?;
+                    }
+
+                    Ok(result)
+                }
+                _ => Err("First element is not a function".to_string()),
+            }
         }
 
-        // Case for other types of AST nodes, delegated to eval_ast
+        // Other cases, delegate to eval_ast
         _ => eval_ast(ast, env),
     }
 }
