@@ -92,9 +92,7 @@ pub struct Env {
 
 // Implementation for Env
 impl Env {
-    pub fn new(
-        parent: Option<BindingsHandle>,
-    ) -> Self {
+    pub fn new(parent: Option<BindingsHandle>) -> Self {
         let bindings = Rc::new(RefCell::new(Bindings::new(parent)));
 
         Env { bindings }
@@ -176,6 +174,41 @@ pub fn do_func(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     Ok(res)
 }
 
+pub fn if_special_form(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
+    if args.len() < 2 || args.len() > 3 {
+        return Err("if requires two or three arguments".to_string());
+    }
+
+    let condition = &args[0];
+    let then_expr = &args[1];
+    let else_expr = if args.len() == 3 {
+        Some(&args[2])
+    } else {
+        None
+    };
+
+    // eval condition
+    let condition_res = eval(condition, Rc::clone(&env))?;
+
+    // Determine if the condition is truthy (anything other than nil or false)
+    let is_truthy = match condition_res {
+        MalValue::Nil => false,
+        MalValue::Bool(false) => false,
+        _ => true,
+    };
+
+    if is_truthy {
+        // Evaluate and return then_expr
+        eval(then_expr, env)
+    } else if let Some(else_expr) = else_expr {
+        // Evaluate and return else_expr
+        eval(else_expr, env)
+    } else {
+        // No else_expr provided, return nil
+        Ok(MalValue::Nil)
+    }
+}
+
 pub fn fn_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     if args.len() != 2 {
         return Err("fn* requires exactly two arguments".to_string());
@@ -234,9 +267,9 @@ pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     // 3. Env::new(Rc::clone(&env.borrow().bindings)) -- Create a new environment with the cloned bindings as the parent
     // 4. RefCell::new(Env::new(Rc::clone(&env.borrow().bindings))) -- Wrap the new environment in a RefCell to allow interior mutability
     // 5. Rc::new(RefCell::new(Env::new(Rc::clone(&env.borrow().bindings)), None None)) -- Wrap the RefCell in an Rc to allow shared ownership
-    let new_env = Rc::new(RefCell::new(Env::new(
-        Some(Rc::clone(&env.borrow().bindings)),
-    )));
+    let new_env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(
+        &env.borrow().bindings,
+    )))));
 
     // Iterate over bindings in pairs
     for pair in bindings_list.chunks(2) {
@@ -300,6 +333,11 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
     repl_env.borrow_mut().set(
         "fn*".to_string(),
         MalValue::BuiltinFunction(Function::SpecialForm(fn_star)),
+    );
+
+    repl_env.borrow_mut().set(
+        "if".to_string(),
+        MalValue::BuiltinFunction(Function::SpecialForm(if_special_form)),
     );
 
     repl_env
