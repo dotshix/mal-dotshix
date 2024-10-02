@@ -245,6 +245,7 @@ pub fn fn_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     Ok(MalValue::BuiltinFunction(func))
 }
 
+
 pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     if args.len() != 2 {
         return Err("let* requires exactly two arguments".to_string());
@@ -295,6 +296,13 @@ pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     eval(&body, Rc::clone(&new_env))
 }
 
+
+// TODO Have to move these
+
+pub fn list(args: &[MalValue]) -> Result<MalValue> {
+    Ok(MalValue::Round(args.to_vec()))
+}
+
 // Function to create the REPL environment with built-in functions
 pub fn create_repl_env() -> Rc<RefCell<Env>> {
     let repl_env = Rc::new(RefCell::new(Env::new(None)));
@@ -338,6 +346,11 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
     repl_env.borrow_mut().set(
         "if".to_string(),
         MalValue::BuiltinFunction(Function::SpecialForm(if_special_form)),
+    );
+
+    repl_env.borrow_mut().set(
+        "list".to_string(),
+        MalValue::BuiltinFunction(Function::Builtin(list)),
     );
 
     repl_env
