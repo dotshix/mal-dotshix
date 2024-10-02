@@ -311,6 +311,18 @@ pub fn list_question(args: &[MalValue]) -> Result<MalValue> {
     }
 }
 
+pub fn empty_question(args: &[MalValue]) -> Result<MalValue> {
+    if args.is_empty() {
+        return Err("empty? requires exactly one argument".to_string());
+    }
+
+    match &args[0] {
+        MalValue::Round(list) | MalValue::Square(list) => Ok(MalValue::Bool(list.is_empty())),
+        MalValue::String(s) => Ok(MalValue::Bool(s.is_empty())),
+        _ => Ok(MalValue::Bool(false)), // Non-collection types are not empty
+    }
+}
+
 // Function to create the REPL environment with built-in functions
 pub fn create_repl_env() -> Rc<RefCell<Env>> {
     let repl_env = Rc::new(RefCell::new(Env::new(None)));
@@ -364,6 +376,11 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
     repl_env.borrow_mut().set(
         "list?".to_string(),
         MalValue::BuiltinFunction(Function::Builtin(list_question)),
+    );
+
+    repl_env.borrow_mut().set(
+        "empty?".to_string(),
+        MalValue::BuiltinFunction(Function::Builtin(empty_question)),
     );
 
     repl_env
