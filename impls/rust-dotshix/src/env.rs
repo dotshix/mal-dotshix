@@ -245,7 +245,6 @@ pub fn fn_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     Ok(MalValue::BuiltinFunction(func))
 }
 
-
 pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     if args.len() != 2 {
         return Err("let* requires exactly two arguments".to_string());
@@ -296,11 +295,20 @@ pub fn let_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
     eval(&body, Rc::clone(&new_env))
 }
 
-
 // TODO Have to move these
 
 pub fn list(args: &[MalValue]) -> Result<MalValue> {
     Ok(MalValue::Round(args.to_vec()))
+}
+
+pub fn list_question(args: &[MalValue]) -> Result<MalValue> {
+    if args.is_empty() {
+        return Err("list? requires at least one argument".to_string());
+    }
+    match args[0] {
+        MalValue::Round(_) => Ok(MalValue::Bool(true)),
+        _ => Ok(MalValue::Bool(false)),
+    }
 }
 
 // Function to create the REPL environment with built-in functions
@@ -351,6 +359,11 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
     repl_env.borrow_mut().set(
         "list".to_string(),
         MalValue::BuiltinFunction(Function::Builtin(list)),
+    );
+
+    repl_env.borrow_mut().set(
+        "list?".to_string(),
+        MalValue::BuiltinFunction(Function::Builtin(list_question)),
     );
 
     repl_env
