@@ -323,6 +323,19 @@ pub fn empty_question(args: &[MalValue]) -> Result<MalValue> {
     }
 }
 
+pub fn count(args: &[MalValue]) -> Result<MalValue> {
+    if args.is_empty() {
+        return Err("Count requires exactly one argument".to_string());
+    }
+
+    match &args[0] {
+        MalValue::Round(list) | MalValue::Square(list) => Ok(MalValue::Number(list.len() as i64)),
+        MalValue::String(list) => Ok(MalValue::Number(list.len() as i64)),
+        MalValue::Nil => Ok(MalValue::Number(0)),
+        _ => Ok(MalValue::Nil),
+    }
+}
+
 // Function to create the REPL environment with built-in functions
 pub fn create_repl_env() -> Rc<RefCell<Env>> {
     let repl_env = Rc::new(RefCell::new(Env::new(None)));
@@ -381,6 +394,11 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
     repl_env.borrow_mut().set(
         "empty?".to_string(),
         MalValue::BuiltinFunction(Function::Builtin(empty_question)),
+    );
+
+    repl_env.borrow_mut().set(
+        "count".to_string(),
+        MalValue::BuiltinFunction(Function::Builtin(count)),
     );
 
     repl_env
