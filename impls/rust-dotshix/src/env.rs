@@ -52,6 +52,19 @@ impl Clone for Function {
     }
 }
 
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Function::Builtin(f1), Function::Builtin(f2)) => f1 == f2,
+            (Function::SpecialForm(f1), Function::SpecialForm(f2)) => f1 == f2,
+            (
+                Function::UserDefined { params: p1, body: b1, .. },
+                Function::UserDefined { params: p2, body: b2, .. }
+            ) => p1 == p2 && b1 == b2, // Ignore the environment, compare only params and body
+            _ => false,
+        }
+    }
+}
 // Struct for Bindings
 pub struct Bindings {
     current_level: HashMap<String, MalValue>,
@@ -302,7 +315,7 @@ pub fn list(args: &[MalValue]) -> Result<MalValue> {
 }
 
 pub fn list_question(args: &[MalValue]) -> Result<MalValue> {
-    if args.is_empty() {
+    if args.len() != 1 {
         return Err("list? requires at least one argument".to_string());
     }
     match args[0] {
@@ -312,7 +325,7 @@ pub fn list_question(args: &[MalValue]) -> Result<MalValue> {
 }
 
 pub fn empty_question(args: &[MalValue]) -> Result<MalValue> {
-    if args.is_empty() {
+    if args.len() != 1 {
         return Err("empty? requires exactly one argument".to_string());
     }
 
@@ -324,7 +337,7 @@ pub fn empty_question(args: &[MalValue]) -> Result<MalValue> {
 }
 
 pub fn count(args: &[MalValue]) -> Result<MalValue> {
-    if args.is_empty() {
+    if args.len() != 1 {
         return Err("Count requires exactly one argument".to_string());
     }
 
@@ -336,6 +349,13 @@ pub fn count(args: &[MalValue]) -> Result<MalValue> {
     }
 }
 
+pub fn equals(args: &[MalValue]) -> Result<MalValue> {
+    if args.len() != 2 {
+        return Err("= requires exactly two argument".to_string());
+    }
+
+    Ok(MalValue::Bool(args[0] == args[1]))
+}
 // Function to create the REPL environment with built-in functions
 pub fn create_repl_env() -> Rc<RefCell<Env>> {
     let repl_env = Rc::new(RefCell::new(Env::new(None)));
@@ -399,6 +419,11 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
     repl_env.borrow_mut().set(
         "count".to_string(),
         MalValue::BuiltinFunction(Function::Builtin(count)),
+    );
+
+    repl_env.borrow_mut().set(
+        "=".to_string(),
+        MalValue::BuiltinFunction(Function::Builtin(equals)),
     );
 
     repl_env

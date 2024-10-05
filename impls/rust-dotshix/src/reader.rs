@@ -27,6 +27,30 @@ pub enum MalValue {
     // Other(String),         // Represents any other token not specifically categorized, e.g., +
     EOI, // Represents the end of input
 }
+
+impl PartialEq for MalValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (MalValue::String(s1), MalValue::String(s2)) => s1 == s2,
+            (MalValue::Symbol(s1), MalValue::Symbol(s2)) => s1 == s2,
+            (MalValue::Number(n1), MalValue::Number(n2)) => n1 == n2,
+            (MalValue::Bool(b1), MalValue::Bool(b2)) => b1 == b2,
+            (MalValue::Nil, MalValue::Nil) => true,
+            (MalValue::Round(v1), MalValue::Round(v2)) => v1 == v2,
+            (MalValue::Square(v1), MalValue::Square(v2)) => v1 == v2,
+            (MalValue::Curly(v1), MalValue::Curly(v2)) => v1 == v2,
+            //(MalValue::Mal(v1), MalValue::Mal(v2)) => v1 == v2,
+            //(MalValue::Comment(c1), MalValue::Comment(c2)) => c1 == c2,
+            //(MalValue::NonSpecialSeq(s1), MalValue::NonSpecialSeq(s2)) => s1 == s2,
+            (MalValue::Atom(a1), MalValue::Atom(a2)) => a1 == a2,
+            // Compare function pointers for equality
+            (MalValue::BuiltinFunction(f1), MalValue::BuiltinFunction(f2)) => f1 == f2,
+            (MalValue::EOI, MalValue::EOI) => true,
+            _ => false, // Default case for non-matching variants
+        }
+    }
+}
+
 pub fn format_pest_error(error: Error<Rule>) -> String {
     match error.variant {
         ErrorVariant::ParsingError {
