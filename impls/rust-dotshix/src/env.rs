@@ -58,8 +58,16 @@ impl PartialEq for Function {
             (Function::Builtin(f1), Function::Builtin(f2)) => f1 == f2,
             (Function::SpecialForm(f1), Function::SpecialForm(f2)) => f1 == f2,
             (
-                Function::UserDefined { params: p1, body: b1, .. },
-                Function::UserDefined { params: p2, body: b2, .. }
+                Function::UserDefined {
+                    params: p1,
+                    body: b1,
+                    ..
+                },
+                Function::UserDefined {
+                    params: p2,
+                    body: b2,
+                    ..
+                },
             ) => p1 == p2 && b1 == b2, // Ignore the environment, compare only params and body
             _ => false,
         }
@@ -356,6 +364,28 @@ pub fn equals(args: &[MalValue]) -> Result<MalValue> {
 
     Ok(MalValue::Bool(args[0] == args[1]))
 }
+
+pub fn comparison_operator(op: &str, args: &[MalValue]) -> Result<MalValue> {
+    if args.len() != 2 {
+        return Err(format!("{} requires exactly two arguments", op));
+    }
+
+    let (a, b) = match (args.get(0), args.get(1)) {
+        (Some(MalValue::Number(a)), Some(MalValue::Number(b))) => (*a, *b),
+        _ => return Err("Arguments must be numbers".into()),
+    };
+
+    let result = match op {
+        "<" => a < b,
+        "<=" => a <= b,
+        ">" => a > b,
+        ">=" => a >= b,
+        _ => return Err(format!("Unsupported operator: {}", op)),
+    };
+
+    Ok(MalValue::Bool(result))
+}
+
 // Function to create the REPL environment with built-in functions
 pub fn create_repl_env() -> Rc<RefCell<Env>> {
     let repl_env = Rc::new(RefCell::new(Env::new(None)));
@@ -424,6 +454,26 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
     repl_env.borrow_mut().set(
         "=".to_string(),
         MalValue::BuiltinFunction(Function::Builtin(equals)),
+    );
+
+    repl_env.borrow_mut().set(
+        "<".to_string(),
+        MalValue::BuiltinFunction(Function::Builtin(|args| comparison_operator("<", args))),
+    );
+
+    repl_env.borrow_mut().set(
+        "<=".to_string(),
+        MalValue::BuiltinFunction(Function::Builtin(|args| comparison_operator("<=", args))),
+    );
+
+    repl_env.borrow_mut().set(
+        ">".to_string(),
+        MalValue::BuiltinFunction(Function::Builtin(|args| comparison_operator(">", args))),
+    );
+
+    repl_env.borrow_mut().set(
+        ">=".to_string(),
+        MalValue::BuiltinFunction(Function::Builtin(|args| comparison_operator(">=", args))),
     );
 
     repl_env
