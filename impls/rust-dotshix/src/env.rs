@@ -404,6 +404,15 @@ pub fn pr_str_fn(args: &[MalValue]) -> Result<MalValue> {
     Ok(MalValue::String(strs))
 }
 
+pub fn str_fn(args: &[MalValue]) -> Result<MalValue> {
+    let strs = args.iter()
+        .map(|v| pr_str(v, false))
+        .collect::<Vec<String>>()
+        .join("");
+
+    Ok(MalValue::String(strs))
+}
+
 // Function to create the REPL environment with built-in functions
 pub fn create_repl_env() -> Rc<RefCell<Env>> {
     let repl_env = Rc::new(RefCell::new(Env::new(None)));
@@ -501,6 +510,10 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
     repl_env.borrow_mut().set(
         "pr-str".to_string(),
         MalValue::BuiltinFunction(Function::Builtin(pr_str_fn)));
+
+    repl_env.borrow_mut().set(
+        "str".to_string(),
+        MalValue::BuiltinFunction(Function::Builtin(str_fn)));
 
 
     repl_env
