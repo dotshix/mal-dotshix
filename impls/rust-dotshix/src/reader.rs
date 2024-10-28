@@ -94,9 +94,12 @@ fn build_ast(pair: Pair<Rule>) -> MalValue {
 
     match pair.as_rule() {
         Rule::STRING => {
-            let content = pair.as_str().to_string();
-            debug!("STRING content: {:?}", content);
-            MalValue::String(content)
+            let content_with_quotes = pair.as_str();
+            // Remove the surrounding quotes
+            let inner_content = &content_with_quotes[1..content_with_quotes.len() - 1];
+            // Unescape the string content
+            let unescaped = unescape_string(inner_content);
+            MalValue::String(unescaped)
         }
 
         Rule::symbol => {
@@ -232,4 +235,34 @@ fn build_ast(pair: Pair<Rule>) -> MalValue {
             panic!("Unexpected rule: {:?}", pair.as_rule());
         }
     }
+}
+
+fn unescape_string(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('n') => result.push('\n'),
+                Some('r') => result.push('\r'),
+                Some('t') => result.push('\t'),
+                Some('\\') => result.push('\\'),
+                Some('"') => result.push('"'),
+                Some(other) => {
+                    // Handle unknown escape sequences by including the backslash and character
+                    result.push('\\');
+                    result.push(other);
+                },
+                None => {
+                    // Backslash at end of string
+                    result.push('\\');
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
 }

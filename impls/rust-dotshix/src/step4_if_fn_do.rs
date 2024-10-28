@@ -4,7 +4,7 @@ mod env;
 
 use env_logger;
 use pest::error::Error;
-use printer::print_node;
+use printer::pr_str;
 use reader::{format_pest_error, parse_input, MalValue, Rule};
 use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
@@ -134,11 +134,11 @@ fn eval_all(input: Vec<MalValue>, env: Rc<RefCell<Env>>) -> Result<Vec<MalValue>
 }
 
 fn print(input: Vec<MalValue>) -> String {
-    for node in input.iter() {
-        print_node(node);
-        print!(" "); // Add space after each top-level element
-    }
-    String::new()
+    input
+        .iter()
+        .map(|node| pr_str(node, true))
+        .collect::<Vec<String>>()
+        .join(" ")
 }
 
 fn rep(input: String, env: Rc<RefCell<Env>>) -> String {

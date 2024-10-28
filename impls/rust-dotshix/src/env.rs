@@ -1,5 +1,6 @@
 use crate::eval;
 use crate::MalValue;
+use crate::printer::pr_str;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -386,6 +387,15 @@ pub fn comparison_operator(op: &str, args: &[MalValue]) -> Result<MalValue> {
     Ok(MalValue::Bool(result))
 }
 
+pub fn prn_fn(args: &[MalValue]) -> Result<MalValue> {
+    let strs = args.iter()
+        .map(|v| pr_str(v, true))
+        .collect::<Vec<String>>()
+        .join(" ");
+    println!("{}", strs);
+    Ok(MalValue::Nil)
+}
+
 // Function to create the REPL environment with built-in functions
 pub fn create_repl_env() -> Rc<RefCell<Env>> {
     let repl_env = Rc::new(RefCell::new(Env::new(None)));
@@ -475,6 +485,10 @@ pub fn create_repl_env() -> Rc<RefCell<Env>> {
         ">=".to_string(),
         MalValue::BuiltinFunction(Function::Builtin(|args| comparison_operator(">=", args))),
     );
+
+    repl_env.borrow_mut().set(
+        "prn".to_string(),
+        MalValue::BuiltinFunction(Function::Builtin(prn_fn)));
 
     repl_env
 }
