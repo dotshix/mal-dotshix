@@ -160,6 +160,9 @@ fn main() -> RustylineResult<()> {
 
     loop {
         let readline = rl.readline("user> ");
+        // NOTE PROBABLY DELETE THIS LATER
+        // part of test cases
+        rep("(def! not (fn* (a) (if a false true)))".to_string(), repl_env.clone());
         match readline {
             Ok(line) => {
                 let result = rep(line, repl_env.clone());
