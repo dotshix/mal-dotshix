@@ -36,8 +36,11 @@ impl PartialEq for MalValue {
             (MalValue::Number(n1), MalValue::Number(n2)) => n1 == n2,
             (MalValue::Bool(b1), MalValue::Bool(b2)) => b1 == b2,
             (MalValue::Nil, MalValue::Nil) => true,
+            // Consider Round and Square equal if their contents are equal
             (MalValue::Round(v1), MalValue::Round(v2)) => v1 == v2,
             (MalValue::Square(v1), MalValue::Square(v2)) => v1 == v2,
+            (MalValue::Round(v1), MalValue::Square(v2)) => v1 == v2,
+            (MalValue::Square(v1), MalValue::Round(v2)) => v1 == v2,
             (MalValue::Curly(v1), MalValue::Curly(v2)) => v1 == v2,
             //(MalValue::Mal(v1), MalValue::Mal(v2)) => v1 == v2,
             //(MalValue::Comment(c1), MalValue::Comment(c2)) => c1 == c2,
