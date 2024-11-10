@@ -21,6 +21,7 @@ pub enum Function {
     // ),
     UserDefined {
         params: Vec<String>,
+        rest_param: Option<String>,
         body: Vec<MalValue>,
         env: Rc<RefCell<Env>>,
     },
@@ -44,8 +45,9 @@ impl Clone for Function {
             Function::Builtin(func) => Function::Builtin(*func),
             // Function::WithEnv(func, env) => Function::WithEnv(*func, Rc::clone(env)),
             Function::SpecialForm(func) => Function::SpecialForm(*func),
-            Function::UserDefined { params, body, env } => Function::UserDefined {
+            Function::UserDefined { params, rest_param, body, env } => Function::UserDefined {
                 params: params.clone(),
+                rest_param: rest_param.clone(),
                 body: body.clone(),
                 env: env.clone(),
             },
@@ -61,15 +63,17 @@ impl PartialEq for Function {
             (
                 Function::UserDefined {
                     params: p1,
+                    rest_param: rp1,
                     body: b1,
                     ..
                 },
                 Function::UserDefined {
                     params: p2,
+                    rest_param: rp2,
                     body: b2,
                     ..
                 },
-            ) => p1 == p2 && b1 == b2, // Ignore the environment, compare only params and body
+            ) => p1 == p2 && b1 == b2 && rp1 == rp2, // Ignore the environment, compare only params and body
             _ => false,
         }
     }
@@ -247,19 +251,57 @@ pub fn fn_star(args: &[MalValue], env: Rc<RefCell<Env>>) -> Result<MalValue> {
         }
     };
 
-    let mut params = Vec::new();
 
-    for param in param_list {
-        match param {
-            MalValue::Symbol(s) => params.push(s.clone()),
-            _ => return Err("fn* Parameters must be Symbols".to_string()),
+    // Find the position of '&' if it exists
+    let amp_pos = param_list.iter().position(|p| matches!(p, MalValue::Symbol(s) if s == "&"));
+
+    // Parse fixed parameters and optional variadic parameter
+    let (fixed_params, rest_param) = match amp_pos {
+        Some(pos) => {
+            // '&' must not be the last element
+            if pos + 1 >= param_list.len() {
+                return Err("Expected symbol after &".to_string());
+            }
+            // '&' must be followed by exactly one symbol
+            if pos + 2 != param_list.len() {
+                return Err("Unexpected parameter after rest parameter".to_string());
+            }
+
+            // Extract the variadic parameter name
+            let rest_param = match &param_list[pos + 1] {
+                MalValue::Symbol(s) => s.clone(),
+                _ => return Err("Expected symbol after &".to_string()),
+            };
+
+            // Collect fixed parameters before '&'
+            let fixed_params = param_list[..pos]
+                .iter()
+                .map(|p| match p {
+                    MalValue::Symbol(s) => Ok(s.clone()),
+                    _ => Err("fn* Parameters must be Symbols".to_string()),
+                })
+                .collect::<Result<Vec<String>>>()?;
+
+            (fixed_params, Some(rest_param))
         }
-    }
+        None => {
+            // No variadic parameter; collect all as fixed parameters
+            let fixed_params = param_list
+                .iter()
+                .map(|p| match p {
+                    MalValue::Symbol(s) => Ok(s.clone()),
+                    _ => Err("fn* Parameters must be Symbols".to_string()),
+                })
+                .collect::<Result<Vec<String>>>()?;
+            (fixed_params, None)
+        }
+    };
 
     let body = vec![args[1].clone()]; // Store the body as a vector of expressions
 
     let func = Function::UserDefined {
-        params,
+        params: fixed_params,
+        rest_param,
         body,
         env: Rc::clone(&env),
     };
