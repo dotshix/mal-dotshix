@@ -1,8 +1,10 @@
+mod core;
+mod env;
 mod printer;
 mod reader;
-mod env;
-mod core;
 
+use core::create_repl_env;
+use env::{Env, Function};
 use env_logger;
 use pest::error::Error;
 use printer::pr_str;
@@ -10,12 +12,9 @@ use reader::{format_pest_error, parse_input, MalValue, Rule};
 use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result as RustylineResult};
-use std::result::Result as StdResult;
-use env::{ Env, Function};
-use std::rc::Rc;
 use std::cell::RefCell;
-use core::create_repl_env;
-
+use std::rc::Rc;
+use std::result::Result as StdResult;
 
 // Custom Result type for our application
 type Result<T> = StdResult<T, String>;
@@ -34,8 +33,12 @@ fn eval_ast(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
                 Ok(MalValue::Symbol(s.clone()))
             }
         }
-        MalValue::Round(list) | MalValue::Square(list) | MalValue::Curly(list) | MalValue::Mal(list) => {
-            let eval_list: Result<Vec<MalValue>> = list.iter().map(|x| eval(x, env.clone())).collect();
+        MalValue::Round(list)
+        | MalValue::Square(list)
+        | MalValue::Curly(list)
+        | MalValue::Mal(list) => {
+            let eval_list: Result<Vec<MalValue>> =
+                list.iter().map(|x| eval(x, env.clone())).collect();
             eval_list.map(|eval_list| match ast {
                 MalValue::Round(_) => MalValue::Round(eval_list),
                 MalValue::Square(_) => MalValue::Square(eval_list),
@@ -89,7 +92,12 @@ fn eval(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
                         .collect::<Result<Vec<MalValue>>>()?;
                     func(&args)
                 }
-                MalValue::BuiltinFunction(Function::UserDefined { params, rest_param, body, env: func_env }) => {
+                MalValue::BuiltinFunction(Function::UserDefined {
+                    params,
+                    rest_param,
+                    body,
+                    env: func_env,
+                }) => {
                     // Evaluate the arguments
                     let args: Vec<MalValue> = list[1..]
                         .iter()
@@ -102,15 +110,14 @@ fn eval(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
                     if num_args < num_fixed_params {
                         return Err(format!(
                             "Expected at least {} arguments but got {}",
-                            num_fixed_params,
-                            num_args
+                            num_fixed_params, num_args
                         ));
                     }
 
                     // Create a new environment for the function
-                    let new_env = Rc::new(RefCell::new(Env::new(
-                        Some(Rc::clone(&func_env.borrow().get_bindings())),
-                    )));
+                    let new_env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(
+                        &func_env.borrow().get_bindings(),
+                    )))));
 
                     // Bind fixed parameters
                     for (param, arg) in params.iter().zip(args.iter()) {
@@ -120,18 +127,14 @@ fn eval(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
                     // Handle rest parameter
                     if let Some(rest_param_name) = rest_param {
                         let rest_args = args[num_fixed_params..].to_vec();
-                        new_env.borrow_mut().set(
-                            rest_param_name.clone(),
-                            MalValue::Round(rest_args),
-                        );
-                    } else {
-                        if num_args > num_fixed_params {
-                            return Err(format!(
-                                "Expected {} arguments but got {}",
-                                num_fixed_params,
-                                num_args
-                            ));
-                        }
+                        new_env
+                            .borrow_mut()
+                            .set(rest_param_name.clone(), MalValue::Round(rest_args));
+                    } else if num_args > num_fixed_params {
+                        return Err(format!(
+                            "Expected {} arguments but got {}",
+                            num_fixed_params, num_args
+                        ));
                     }
 
                     // Evaluate the function body
@@ -185,7 +188,10 @@ fn main() -> RustylineResult<()> {
         // ownerproof-4219578-1730745905-59db954c3998
         // NOTE PROBABLY DELETE THIS LATER
         // part of test cases
-        rep("(def! not (fn* (a) (if a false true)))".to_string(), repl_env.clone());
+        rep(
+            "(def! not (fn* (a) (if a false true)))".to_string(),
+            repl_env.clone(),
+        );
         match readline {
             Ok(line) => {
                 let result = rep(line, repl_env.clone());
