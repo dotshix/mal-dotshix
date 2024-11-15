@@ -58,7 +58,7 @@ fn eval(ast: &MalValue, env: Rc<RefCell<Env>>) -> Result<MalValue> {
             if let Some(value) = env.borrow().get(s) {
                 Ok(value.clone())
             } else {
-                Err(format!("Symbol '{}' not found in environment", s).into())
+                Err(format!("Symbol '{}' not found in environment", s))
             }
         }
 
