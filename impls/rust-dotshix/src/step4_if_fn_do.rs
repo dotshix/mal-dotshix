@@ -19,7 +19,7 @@ use std::result::Result as StdResult;
 // Custom Result type for our application
 type Result<T> = StdResult<T, String>;
 
-fn read(input: String) -> StdResult<Vec<MalValue>, Error<Rule>> {
+fn read(input: String) -> StdResult<Vec<MalValue>, Box<Error<Rule>>> {
     parse_input(&input)
 }
 
@@ -172,7 +172,7 @@ fn rep(input: String, env: Rc<RefCell<Env>>) -> String {
             Ok(evaluated) => print(evaluated),
             Err(e) => format!("Error: {}", e),
         },
-        Err(e) => format!("Error: {:?}", format_pest_error(e)),
+        Err(e) => format!("Error: {:?}", format_pest_error(*e)),
     }
 }
 

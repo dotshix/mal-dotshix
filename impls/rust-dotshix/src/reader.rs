@@ -79,8 +79,8 @@ pub fn format_pest_error(error: Error<Rule>) -> String {
     }
 }
 
-pub fn parse_input(input: &str) -> Result<Vec<MalValue>, Error<Rule>> {
-    let pairs = MalParser::parse(Rule::mal, input)?;
+pub fn parse_input(input: &str) -> Result<Vec<MalValue>, Box<Error<Rule>>> {
+    let pairs = MalParser::parse(Rule::mal, input).map_err(Box::new)?;
     let mut ast = Vec::new();
 
     for pair in pairs {
