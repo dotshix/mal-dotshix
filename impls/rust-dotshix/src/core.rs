@@ -13,7 +13,7 @@ type Result<T> = StdResult<T, String>;
 // Utility Functions for Arithmetic Operations
 fn validate_and_extract(args: &[MalValue], func_name: &str) -> Result<(i64, i64)> {
     if args.len() != 2 {
-        return Err(format!("Expected exactly two arguments for {} function", func_name).into());
+        return Err(format!("Expected exactly two arguments for {} function", func_name));
     }
 
     if let (MalValue::Number(a), MalValue::Number(b)) = (&args[0], &args[1]) {
