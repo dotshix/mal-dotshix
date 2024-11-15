@@ -1,6 +1,7 @@
 mod printer;
 mod reader;
 mod env;
+mod core;
 
 use env_logger;
 use pest::error::Error;
@@ -10,9 +11,10 @@ use rustyline::config::Configurer;
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result as RustylineResult};
 use std::result::Result as StdResult;
-use env::{create_repl_env, Env, Function};
+use env::{ Env, Function};
 use std::rc::Rc;
 use std::cell::RefCell;
+use core::create_repl_env;
 
 
 // Custom Result type for our application
